@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GDP Growth DataVis by Zheng Huabin</title>
+    <script type="text/javascript" src="d3.js"></script>
+    <style>
+        body{
+            font-family: 微软雅黑;
+            font-size:14px;
+        }
+        h1{
+            font-size:120%;
+        }
+        #view1,#view2{
+            font-size:110%;
+        }
+        #map{
+            float:left;
+            margin-right: 20px;
+        }
+    </style>
+</head>
+<body>
+<div id="title">
+    <h1>DataVis 郑骅斌</h1>
+    <h1>GDP growth (annual %)</h1>
+</div>
+<div id="map"></div>
+<div>
+    <p>
+        <a href="GDP_Growth.html">GDP Growth</a>
+        <a href="GDP.html">GDP</a>
+    </p>
+    <p>
+        <a href="NET_User.html">Internet users (per 100 people)</a>
+        <a href="Rural_Population.html">Rural population</a>
+    </p>
+
+    <p>
+        <a href="Population_Female.html">Population, female</a>
+        <a href="Population_Growth.html">Population growth</a>
+    </p>
+
+    <div id="view1">Country : Value</div>
+    <div id="chart1"></div>
+    <div id="view2">Country : Value</div>
+    <div id="chart2"></div>
+    <div id="detail"></div>
+</div>
+
+
+
+<script>
+    var width = 800;
+    var height = 600;
+    var projection = d3.geo.mercator()
+            .translate([width/2, height/1.5])
+            .scale([150]);
+    var path = d3.geo.path()
+            .projection(projection);
+
+    var color = d3.scale.quantize()
+            .range(["rgb(237,248,233)","rgb(186,228,179)","rgb(116,196,118)","rgb(49,163,84)","rgb(0,109,44)"]);
+
+    var svg = d3.select("#map")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+    d3.csv("countriesData.csv", function(data) {
+        //dataMap for all data
+        //showMap for what's shown on the map
+        var w = 400;
+        var h = 100;
+
+        var dataset = [];
+        var xScale = d3.scale.ordinal()
+                .domain(d3.range(dataset.length))
+                .rangeRoundBands([0, w], 0.05);
+        var yScale = d3.scale.linear()
+                .domain([0, d3.max(dataset)])
+                .range([0, h]);
+
+        var chart = d3.select("#chart1")
+                .append("svg")
+                .attr("width", w)
+                .attr("height", h);
+        chart.selectAll("rect")
+                .data(dataset)
+                .enter()
+                .append("rect")
+                .attr("x", function(d, i) {
+                    return xScale(i) + i * 4;
+                })
+                .attr("y", function(d) {
+                    return h - yScale(d);
+                })
+                .attr("width", xScale.rangeBand())
+                .attr("height", function(d) {
+                    return yScale(d);
+                })
+                .attr("fill","white");
+        var chart2 = d3.select("#chart2")
+                .append("svg")
+                .attr("width", w)
+                .attr("height", h);
+        chart2.selectAll("rect")
+                .data(dataset)
+                .enter()
+                .append("rect")
+                .attr("x", function(d, i) {
+                    return xScale(i) + i * 4;
+                })
+                .attr("y", function(d) {
+                    return h - yScale(d);
+                })
+                .attr("width", xScale.rangeBand())
+                .attr("height", function(d) {
+                    return yScale(d);
+                })
+                .attr("fill","white");
+
+
+        var dataMap = {};
+        var countryMap = {};
+        var showMap = {};
+        var colorArray = new Array();
+        var i = 0;
+
+        var index = 0;
+        d3.json("world-countries.json", function(json) {
+            //show GDP growth 2014 data
+            for (; i < data.length; i = i + 17) {
+                var country = data[i]["Country Name"];
+                countryMap[country] = data[i]["Country Code"];
+                var group = data[i]["Series Code"];
+                var id = countryMap[country] + group;
+                var dataSet = [data[i]["2010 [YR2010]"], data[i]["2011 [YR2011]"],
+                    data[i]["2012 [YR2012]"], data[i]["2013 [YR2013]"], data[i]["2014 [YR2014]"]];
+                dataMap[id] = dataSet;
+                showMap[country] = dataSet[4];
+                colorArray[index] = showMap[country];
+                index++;
+                for (var j = 0; j < json.features.length; j++) {
+                    var jsonCountry = json.features[j].properties.name;
+                    if (country == jsonCountry) {
+                        json.features[j].properties.value = showMap[country];
+                        break;
+                    }
+                }
+            }
+
+            color.domain([
+                d3.min(colorArray, function(d) { return d; }),
+                d3.max(colorArray, function(d) { return d; })
+            ]);
+
+            var update = 2;
+            var viewData = function (d) {
+                var i = 0;
+                var group = data[i]["Series Code"];
+                var id = countryMap[d] + group;
+                dataset = dataMap[id];
+                xScale.domain(d3.range(dataset.length));
+                yScale.domain([0, 20]);
+                document.getElementById("detail").innerHTML = "Data Detail" +
+                        "<table border='1'>" +
+                        "<tr><th>2010</th><td>" + dataset[0] + "</td></tr>" +
+                        "<tr><th>2011</th><td>" + dataset[1] + "</td></tr>" +
+                        "<tr><th>2012</th><td>" + dataset[2] + "</td></tr>" +
+                        "<tr><th>2013</th><td>" + dataset[3] + "</td></tr>" +
+                        "<tr><th>2014</th><td>" + dataset[4] + "</td></tr>" +
+                        +"</table>";
+                if (update == 2) {
+                    d3.select("#view1").text(d + " : " + showMap[d]);
+                    var bars = chart.selectAll("rect")
+                            .data(dataset);
+                    bars.enter()
+                            .append("rect")
+                            .attr("x", w)
+                            .attr("y", function(d) {
+                                return h - yScale(d);
+                            })
+                            .attr("width", xScale.rangeBand())
+                            .attr("height", function(d) {
+                                return yScale(d);
+                            });
+                    bars.transition()
+                            .duration(500)
+                            .attr("x", function(d, i) {
+                                return xScale(i) + 	i * 4;
+                            })
+                            .attr("y", function(d) {
+                                return h - yScale(d);
+                            })
+                            .attr("width", xScale.rangeBand())
+                            .attr("height", function(d) {
+                                return yScale(d);
+                            })
+                            .attr("fill","rgb(186,228,179)");
+                    bars.append("text").text(country);
+                    update = 1;
+                } else if (update == 1){
+                    d3.select("#view2").text(d + " : " + showMap[d]);
+                    var bars = chart2.selectAll("rect")
+                            .data(dataset);
+                    bars.enter()
+                            .append("rect")
+                            .attr("x", w)
+                            .attr("y", function(d) {
+                                return h - yScale(d);
+                            })
+                            .attr("width", xScale.rangeBand())
+                            .attr("height", function(d) {
+                                return yScale(d);
+                            });
+                    bars.transition()
+                            .duration(500)
+                            .attr("x", function(d, i) {
+                                return xScale(i) + 	i * 4;
+                            })
+                            .attr("y", function(d) {
+                                return h - yScale(d);
+                            })
+                            .attr("width", xScale.rangeBand())
+                            .attr("height", function(d) {
+                                return yScale(d);
+                            })
+                            .attr("fill","rgb(116,196,118)");
+                    update = 2;
+                }
+            };
+            svg.selectAll("path")
+                    .data(json.features)
+                    .enter()
+                    .append("path")
+                    .attr("d", path)
+                    .attr("fill", function(d) {
+                        var value = d.properties.value;
+                        if (value) {
+                            return color(value);
+                        } else {
+                            return "#ccc";
+                        };
+                    })
+                    .attr("stroke", "rgba(0,0,0,0.2)")
+                    .attr("stroke-width", 1)
+                    .on("mouseover", function(d) {
+                        d3.select(this)
+                                .transition()
+                                .attr("fill","orange");
+
+                    })
+                    .on("mouseout", function() {
+                        d3.select(this)
+                                .transition()
+                                .duration(500)
+                                .attr("fill", function(d) {
+                                    var value = d.properties.value;
+                                    if (value) {
+                                        return color(value);
+                                    } else {
+                                        return "#ccc";
+                                    };
+
+                                })
+                    })
+                    .on("click",function (d) {
+                        viewData(d.properties.name);
+                    });
+            });
+
+    });
+
+</script>
+</body>
+</html>
